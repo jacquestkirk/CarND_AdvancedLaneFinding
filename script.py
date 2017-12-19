@@ -24,6 +24,25 @@ class imageSpaceData:
 
         self.grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+class line:
+    def __init__(self, numFrames):
+        self.line_history = np.zeros(shape = (numFrames, 3))
+        self.radius_of_curvature = np.zeros(numFrames)
+        self.center_distance = np.zeros(numFrames)
+        self.index = 0
+
+    def addToLineHistory(self, toAdd):
+        self.line_history[self.index,:] = toAdd
+
+    def addToRadiusOfCurvature(self, toAdd):
+        self.radius_of_curvature[self.index] = toAdd
+
+    def addToCenter_distance(self, toAdd):
+        self.center_distance[self.index] = toAdd
+
+    def incrementIndex(self):
+        self.index += 1
+
 def drawPolygon(image, region_of_interest, color=[255, 0, 0], thickness=5):
     x = [region_of_interest[0][0],
          region_of_interest[1][0],
@@ -71,13 +90,17 @@ def Value_Select(image, thresh=(0, 255)):
     return binary_output
 
 
+
 def process_image(image):
 
+    #undistort
     undist = cv2.undistort(image, camera.mtx, camera.dst, None, camera.mtx)
 
     #drawPolygon(undist, camera.region_of_interest)
 
+    #convert to top down view
     top_down = cv2.warpPerspective(undist, camera.M, camera.img_size)
+
 
     top_down_imageSpace = imageSpaceData(top_down)
 
@@ -124,6 +147,9 @@ def process_image(image):
     right_lane_inds = []
 
     # Step through the windows one by one
+
+
+
     for window in range(nwindows):
         # Identify window boundaries in x and y (and right and left)
         win_y_low = binary_warped.shape[0] - (window + 1) * window_height
@@ -166,9 +192,12 @@ def process_image(image):
     if(leftx.shape[0]<10):
         return out_img
     left_fit = np.polyfit(lefty, leftx, 2)
+
+
     if (rightx.shape[0] < 10):
         return out_img
     right_fit = np.polyfit(righty, rightx, 2)
+
 
     # Generate x and y values for plotting
     ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
@@ -186,18 +215,38 @@ def process_image(image):
     # Draw the lane onto the warped blank image
     cv2.fillPoly(out_img, np.int_([pts]), (0, 255, 0))
 
-    #return out_img
+    #calculate radius of curvature
+    y_eval = np.max(ploty)
+
+    # Define conversions in x and y from pixels space to meters
+    ym_per_pix = 30 / 720  # meters per pixel in y dimension
+    xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+
+    # Fit new polynomials to x,y in world space
+    left_fit_cr = np.polyfit(lefty * ym_per_pix, leftx * xm_per_pix, 2)
+    right_fit_cr = np.polyfit(righty * ym_per_pix, rightx * xm_per_pix, 2)
+    # Calculate the new radii of curvature
+    left_curverad = ((1 + (2 * left_fit_cr[0] * y_eval * ym_per_pix + left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit_cr[0])
+    right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * right_fit_cr[0])
 
 
-    #plt.imshow(out_img)
-    #plt.plot(left_fitx, ploty, color='yellow')
-    #plt.plot(right_fitx, ploty, color='yellow')
-    #plt.xlim(0, 1280)
-    #plt.ylim(720, 0)
+
+    #calculate distance from center
+    center_location = np.average([left_fitx[y_eval], right_fitx[y_eval]]) - out_img.shape[0]/2
+    center_location = center_location * xm_per_pix #counvert to real distance
+
 
     #unTransform fit arrays
     perspectiveLines = cv2.warpPerspective(out_img, camera.M_inverse, camera.img_size)
     result = cv2.addWeighted(undist, 1, perspectiveLines, 0.3, 0)
+
+    leftLine.addToLineHistory(left_fit.T)
+    rightLine.addToLineHistory(right_fit.T)
+    leftLine.addToRadiusOfCurvature(left_curverad)
+    rightLine.addToRadiusOfCurvature(right_curverad)
+    leftLine.addToCenter_distance(center_location)
+    leftLine.incrementIndex()
+    rightLine.incrementIndex()
 
     return result
 
@@ -212,8 +261,44 @@ if cameraCal:
 
 camera = Camera(mtx, dist)
 
-clip1 = VideoFileClip("project_video.mp4").subclip(0,5)#.subclip(21,24)#.subclip(40,43)
+start_time = 0
+end_time = 50
+num_Frames = (end_time - start_time) * 25 +1
+
+leftLine = line(num_Frames)
+rightLine = line(num_Frames)
+
+clip1 = VideoFileClip("project_video.mp4").subclip(start_time,end_time)#.subclip(21,24)#.subclip(40,43)
+
 
 newClip = clip1.fl_image(process_image) #NOTE: this function expects color images!!
 newClip.write_videofile('project_video_processed.mp4', audio=False)
+
+time = np.linspace(0, (end_time - start_time), leftLine.center_distance.__len__())
+
+fig1, (ax_fit0, ax_fit1, ax_fit2, ax_roc, ax_center) = plt.subplots(5, 1, sharex=True)
+
+
+ax_fit0.plot(time, leftLine.line_history[:, 0], color='r')
+ax_fit0.plot(time, rightLine.line_history[:, 0], color='b')
+ax_fit0.plot(time, np.abs(leftLine.line_history[:, 0] - rightLine.line_history[:, 0]), color='g')
+ax_fit0.set_ylabel('fit0')
+
+ax_fit1.plot(time, leftLine.line_history[:, 1], color='r')
+ax_fit1.plot(time, rightLine.line_history[:, 1], color='b')
+ax_fit1.plot(time, np.abs(leftLine.line_history[:, 1] - rightLine.line_history[:, 1]), color='g')
+ax_fit1.set_ylabel('fit1')
+
+ax_fit2.plot(time, leftLine.line_history[:, 2], color='r')
+ax_fit2.plot(time, rightLine.line_history[:, 2], color='b')
+ax_fit2.set_ylabel('fit2')
+
+ax_roc.plot(time, leftLine.radius_of_curvature, color='r')
+ax_roc.plot(time, rightLine.radius_of_curvature, color='b')
+ax_roc.set_ylabel('Radius Of Curvature')
+
+ax_center.plot(time, leftLine.center_distance, color='b')
+ax_center.set_ylabel('Center')
+
+
 
