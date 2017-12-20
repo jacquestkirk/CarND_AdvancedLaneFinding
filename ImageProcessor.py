@@ -19,6 +19,10 @@ class imageSpaceData:
 class ImageProcessor:
 
     def __init__(self, camera, leftLine, rightLine, showWindows = False):
+
+
+
+
         self.image = None
         self.camera = camera
         self.leftLine = leftLine
@@ -55,8 +59,7 @@ class ImageProcessor:
         self.top_down = self.getTopDown(self.undist)
         self.mask = self.generateMask(self.top_down)
         self.fitted_top_down = self.findFit(self.mask)
-        self.revertedPerspective = self.revertPerspective(self.fitted_top_down)
-        self.result = cv2.addWeighted(self.undist, 1, self.revertedPerspective, 0.3, 0)
+
 
         [left_curverad, right_curverad] = self.calculateRadiusOfCurvature()
         center_location = self.calculateDistanceFromCenter()
@@ -68,6 +71,11 @@ class ImageProcessor:
         self.leftLine.addToCenter_distance(center_location)
         self.leftLine.incrementIndex()
         self.rightLine.incrementIndex()
+
+        self.filtered_top_down = self.drawFitLine(self.fitted_top_down)
+
+        self.revertedPerspective = self.revertPerspective(self.filtered_top_down)
+        self.result = cv2.addWeighted(self.undist, 1, self.revertedPerspective, 0.3, 0)
 
         return self.result
 
@@ -178,20 +186,21 @@ class ImageProcessor:
         self.left_fitx = self.left_fit[0] * self.ploty ** 2 + self.left_fit[1] * self.ploty + self.left_fit[2]
         self.right_fitx = self.right_fit[0] * self.ploty ** 2 + self.right_fit[1] * self.ploty + self.right_fit[2]
 
+        #color selected points
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
 
+        return out_img
+
+    def drawFitLine(self, image):
         # Recast the x and y points into usable format for cv2.fillPoly()
         pts_left = np.array([np.transpose(np.vstack([self.left_fitx, self.ploty]))])
         pts_right = np.array([np.flipud(np.transpose(np.vstack([self.right_fitx, self.ploty])))])
         pts = np.hstack((pts_left, pts_right))
 
         # Draw the lane onto the warped blank image
-        cv2.fillPoly(out_img, np.int_([pts]), (0, 255, 0))
-
-
-
-        return out_img
+        cv2.fillPoly(image, np.int_([pts]), (0, 255, 0))
+        return image
 
     def revertPerspective(self, image):
         # unTransform fit arrays
