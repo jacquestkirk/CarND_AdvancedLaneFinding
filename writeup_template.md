@@ -49,11 +49,10 @@ Using glob, I interated through all the images in the calibration file. I used c
 
 I then use cv2.calibrateCamera to get back the camera camera matrix (mtx) and distortion coefficents (dist)
 
-Uncalibrated and calibrated test images are shown below. 
+Uncalibrated(top) and calibrated(bottom) test images are shown below. 
 
-right: uncalibrated, left: calibrated
-![alt text](\camera_cal\calibration3.jpg)
-![alt text](\camera_cal\processed\calibration3_undistorted.jpg)
+![alt text](./camera_cal/calibration3.jpg)
+![alt text](./camera_cal/processed/calibration3_undistorted.jpg)
 
 in script.py, the camera matrix and distortion coeffiecints are stored in a pickle file and reloaded, so that I don't have to re-run camera calibration every time. 
 
@@ -65,10 +64,10 @@ The pipeline can be found in the processImage() function in [ImageProcessor.py](
 
 Undistortion occurs in the undistort function in ImageProcessor.py using cv2.undistort and the camera matrix and distortion coefficents. 
 
-Below is an example of the original image (left) and the undistorted image (right). 
+Below is an example of the original image (top) and the undistorted image (bottom). 
 
-![alt text](\pipeline_images\originalImage.jpeg)
-![alt text](\pipeline_images\undistorted.jpeg)
+![alt text](./pipeline_images/originalImage.jpeg)
+![alt text](./pipeline_images/undistorted.jpeg)
 
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
@@ -83,7 +82,7 @@ I used these functions to play around with different representation. I eventuall
 
 Below is an example of the results of thresholding. I show the greyscale sobel in green and the saturation sobel in blue. In actual processing I combinded the mask with an or function. 
 
-![alt text](\pipeline_images\mask.jpeg)
+![alt text](./pipeline_images/mask.jpeg)
 
 
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
@@ -93,11 +92,11 @@ This step was actually done before the binary image generation.
 The transformation matrix is calculated at the bottom of [Camera.py](https://github.com/jacquestkirk/CarND_AdvancedLaneFinding/blob/master/Camera.py). The corners of the transform are given in the region_of_interest variable in Camera.py. cv2.getPerspectiveTransform is used to get the tranformation matrix and its inverse. 
 
 The destination points are showin in the image below. 
-![alt text](\pipeline_images\RegionOfInterest.jpeg)
+![alt text](./pipeline_images/RegionOfInterest.jpeg)
 
 Perspective transform was done using the getTopDown function in ImageProcessor.py. Basically it just calls cv2.warpPerspective witht the transformation matrix. The resulting image is shown below. 
 
-![alt text](\pipeline_images\topDown.jpeg)
+![alt text](./pipeline_images/topDown.jpeg)
 
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
@@ -123,7 +122,7 @@ Using the filtered coefficients, I used the fit function to calculate x values a
 
 An example of the resulting image is shown below. 
 
-![alt text](\pipeline_images\fitTopDown.jpeg)
+![alt text](./pipeline_images/fitTopDown.jpeg)
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
@@ -145,7 +144,7 @@ Furthermore, I added text noting the radius of curvature and distance from cente
 
 Below is an example of the results. 
 
-![alt text](\pipeline_images\result.jpeg)
+![alt text](./pipeline_images/result.jpeg)
 
 ---
 
