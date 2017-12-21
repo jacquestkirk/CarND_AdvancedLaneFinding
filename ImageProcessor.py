@@ -30,13 +30,14 @@ class ImageProcessor:
         self.showWindows = showWindows
 
         # Define conversions in x and y from pixels space to meters
-        self.ym_per_pix = 30 / 720  # meters per pixel in y dimension
-        self.xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+        self.ym_per_pix = 60 / 720  # meters per pixel in y dimension
+        self.xm_per_pix = 3.7 / 438  # meters per pixel in x dimension
 
         self.undist = None
         self.top_down = None
         self.color_binary = None
         self.fitted_top_down = None
+        self.filtered_top_down = None
         self.revertedPerspective = None
         self.result = None
 
@@ -60,24 +61,31 @@ class ImageProcessor:
         self.mask = self.generateMask(self.top_down)
         self.fitted_top_down = self.findFit(self.mask)
 
+        self.leftLine.addToLineHistory(self.left_fit.T)
+        self.rightLine.addToLineHistory(self.right_fit.T)
+        delta_fit0 = np.abs(self.left_fit[0] - self.right_fit[0])
+        delta_fit1 = np.abs(self.left_fit[1] - self.right_fit[1])
+        self.leftLine.addFilteredLine(delta_fit0, delta_fit1)
+        self.rightLine.addFilteredLine(delta_fit0, delta_fit1)
+        self.filtered_top_down = self.drawFitLine(self.fitted_top_down)
 
         [left_curverad, right_curverad] = self.calculateRadiusOfCurvature()
         center_location = self.calculateDistanceFromCenter()
-
-        self.leftLine.addToLineHistory(self.left_fit.T)
-        self.rightLine.addToLineHistory(self.right_fit.T)
         self.leftLine.addToRadiusOfCurvature(left_curverad)
         self.rightLine.addToRadiusOfCurvature(right_curverad)
         self.leftLine.addToCenter_distance(center_location)
         self.leftLine.incrementIndex()
         self.rightLine.incrementIndex()
 
-        self.filtered_top_down = self.drawFitLine(self.fitted_top_down)
+
 
         self.revertedPerspective = self.revertPerspective(self.filtered_top_down)
         self.result = cv2.addWeighted(self.undist, 1, self.revertedPerspective, 0.3, 0)
+        self.writeCenterDistance(self.result)
+        self.writeCurvature(self.result)
 
         return self.result
+
 
 
 
@@ -181,10 +189,7 @@ class ImageProcessor:
             return out_img
         self.right_fit = np.polyfit(self.righty, self.rightx, 2)
 
-        # Generate x and y values for plotting
-        self.ploty = np.linspace(0, image.shape[0] - 1, image.shape[0])
-        self.left_fitx = self.left_fit[0] * self.ploty ** 2 + self.left_fit[1] * self.ploty + self.left_fit[2]
-        self.right_fitx = self.right_fit[0] * self.ploty ** 2 + self.right_fit[1] * self.ploty + self.right_fit[2]
+
 
         #color selected points
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
@@ -193,6 +198,15 @@ class ImageProcessor:
         return out_img
 
     def drawFitLine(self, image):
+
+        left_fit = self.leftLine.line_history_filtered[self.leftLine.index]
+        right_fit = self.rightLine.line_history_filtered[self.rightLine.index]
+
+        # Generate x and y values for plotting
+        self.ploty = np.linspace(0, image.shape[0] - 1, image.shape[0])
+        self.left_fitx = left_fit[0] * self.ploty ** 2 + left_fit[1] * self.ploty + left_fit[2]
+        self.right_fitx = right_fit[0] * self.ploty ** 2 + right_fit[1] * self.ploty + right_fit[2]
+
         # Recast the x and y points into usable format for cv2.fillPoly()
         pts_left = np.array([np.transpose(np.vstack([self.left_fitx, self.ploty]))])
         pts_right = np.array([np.flipud(np.transpose(np.vstack([self.right_fitx, self.ploty])))])
@@ -231,10 +245,21 @@ class ImageProcessor:
         y_eval = np.max(self.ploty)
 
         # calculate distance from center
-        center_location = np.average([self.left_fitx[y_eval], self.right_fitx[y_eval]]) - self.image.shape[0] / 2
+        center_location = np.average([self.left_fitx[y_eval], self.right_fitx[y_eval]]) - self.image.shape[1] / 2
         center_location = center_location * self.xm_per_pix  # counvert to real distance
 
         return center_location
+
+    def writeCenterDistance(self, image):
+        text = str.format("Center Distance: {:.2f} m", self.leftLine.center_distance_filtered[self.leftLine.index-1])
+        cv2.putText( image, text, (400, 150), cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255))
+    def writeCurvature(self, image):
+
+        index = self.leftLine.index-1
+        average_curvature = np.average([self.leftLine.radius_of_curvature_filtered[index], self.rightLine.radius_of_curvature_filtered[index]])
+        text = str.format("Curvature: {:.2f} m", average_curvature)
+
+        cv2.putText(image, text, (400, 200), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255))
 
 
 
@@ -285,3 +310,5 @@ class ImageProcessor:
         cv2.line(imageToDrawOn, (x[1], y[1]), (x[2], y[2]), color, thickness)
         cv2.line(imageToDrawOn, (x[2], y[2]), (x[3], y[3]), color, thickness)
         cv2.line(imageToDrawOn, (x[3], y[3]), (x[0], y[0]), color, thickness)
+
+        return imageToDrawOn

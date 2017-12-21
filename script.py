@@ -31,7 +31,7 @@ class line:
     def addToLineHistory(self, toAdd):
         self.line_history[self.index,:] = toAdd
 
-    def addFilteredVersions(self, delta_fit0, delta_fit1):
+    def addFilteredLine(self, delta_fit0, delta_fit1):
 
         if((delta_fit0 > self.max_delta_fit0)
            & (delta_fit1 > self.max_delta_fit1)
@@ -39,19 +39,18 @@ class line:
             #If our limits for max difference in fit variables is not met
             #take the last values
             self.line_history_filtered[self.index] = self.line_history_filtered[self.index-1]
-            self.radius_of_curvature_filtered[self.index] = self.radius_of_curvature_filtered[self.index-1]
-            self.center_distance_filtered[self.index] = self.center_distance_filtered[self.index-1]
-
         else:
             self.runningAverage(self.line_history_filtered, self.line_history)
-            self.runningAverage(self.radius_of_curvature_filtered, self.radius_of_curvature)
-            self.runningAverage(self.center_distance_filtered, self.center_distance)
+
+
 
     def addToRadiusOfCurvature(self, toAdd):
         self.radius_of_curvature[self.index] = toAdd
+        self.runningAverage(self.radius_of_curvature_filtered, self.radius_of_curvature)
 
     def addToCenter_distance(self, toAdd):
         self.center_distance[self.index] = toAdd
+        self.runningAverage(self.center_distance_filtered, self.center_distance)
 
 
     def incrementIndex(self):
@@ -95,7 +94,7 @@ if cameraCal:
 camera = Camera(mtx, dist)
 
 start_time = 0
-end_time = 5
+end_time = 50
 num_Frames = (end_time - start_time) * 25 +1
 
 leftLine = line(num_Frames)
